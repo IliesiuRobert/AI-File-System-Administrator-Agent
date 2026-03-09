@@ -1,0 +1,59 @@
+version: "3.9"
+
+services:
+  ollama:
+    build:
+      context: ./workSpace/ollama
+      dockerfile: Dockerfile
+    container_name: aso_ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+
+  mcp:
+    build:
+      context: ./workSpace/mcp_server
+      dockerfile: Dockerfile
+    container_name: aso_mcp
+    environment:
+      - DIR_WORKSPACE=/workSpace
+    volumes:
+      - ./workSpace:/workSpace:rw
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:8050/mcp > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+
+  adk:
+    build:
+      context: ./workSpace/adk
+      dockerfile: Dockerfile
+    container_name: aso_adk
+    environment:
+      - LITELLM_BASE_URL=http://ollama:11434
+      - OLLAMA_API_BASE=http://ollama:11434
+      - LITELLM_MODEL=ollama_chat/llama3.2:3b
+      - DIR_WORKSPACE=/workSpace
+      - MCP_HTTP_URL=http://mcp:8000/mcp
+      - LITELLM_LOG=DEBUG
+    depends_on:
+      - ollama
+      - mcp
+    ports:
+      - "8080:8080"
+
+volumes:
+  ollama_models:
